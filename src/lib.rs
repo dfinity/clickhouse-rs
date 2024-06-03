@@ -9,8 +9,6 @@ extern crate static_assertions;
 use std::{collections::HashMap, sync::Arc, time::Duration};
 
 use hyper::client::connect::HttpConnector;
-#[cfg(feature = "tls")]
-use hyper_tls::HttpsConnector;
 
 pub use clickhouse_derive::Row;
 
@@ -68,10 +66,12 @@ impl Default for Client {
         connector.set_keepalive(Some(TCP_KEEPALIVE));
 
         #[cfg(feature = "tls")]
-        let connector = HttpsConnector::new_with_connector({
-            connector.enforce_http(false);
-            connector
-        });
+        let connector = hyper_rustls::HttpsConnectorBuilder::new()
+            .with_native_roots()
+            .expect("no native root CA certificates found")
+            .https_only()
+            .enable_http1()
+            .build();
 
         let client = hyper::Client::builder()
             .pool_idle_timeout(POOL_IDLE_TIMEOUT)
