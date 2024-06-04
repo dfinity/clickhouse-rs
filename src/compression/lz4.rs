@@ -5,6 +5,7 @@ use std::{
 };
 
 use bytes::{Buf, BufMut, Bytes, BytesMut};
+use cityhash_rs::cityhash_102_128;
 use futures::{ready, stream::Stream};
 use lz4::liblz4::LZ4_decompress_safe;
 
@@ -151,11 +152,6 @@ impl<S> Lz4Decoder<S> {
     }
 }
 
-fn calc_checksum(buffer: &[u8]) -> u128 {
-    let hash = clickhouse_rs_cityhash_sys::city_hash_128(buffer);
-    u128::from(hash.hi) << 64 | u128::from(hash.lo)
-}
-
 fn decompress(compressed: &[u8], uncompressed: &mut [u8]) -> Result<()> {
     let status = unsafe {
         LZ4_decompress_safe(
@@ -213,6 +209,11 @@ fn compression_mode(mode: Compression) -> lz4::block::CompressionMode {
         Compression::Lz4 => CompressionMode::DEFAULT,
         Compression::Lz4Hc(level) => CompressionMode::HIGHCOMPRESSION(level),
     }
+}
+
+fn calc_checksum(buffer: &[u8]) -> u128 {
+    let hash = cityhash_102_128(buffer);
+    hash << 64 | hash >> 64
 }
 
 #[tokio::test]
